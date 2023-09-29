@@ -2,7 +2,8 @@ import express from 'express'
 import cors from "cors"
 import morgan from "morgan"
 import formData from 'express-form-data'
-import { errorHandler } from '../middlewares/error.middleware'
+import router from "../router/index.router.js"
+import { errorHandler } from '../middlewares/error.middleware.js'
 
 export function createServer() {
     const app = express()
@@ -13,10 +14,10 @@ export function createServer() {
     // to enable passing requests through the frontend
     app.use(cors({
         origin: '*', // Replace * with the client's domain if necessary
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        methods: ['GET', 'POST'],
         allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
         credentials: true
-      }));
+    }));
 
     // Form type
     app.use(express.json())
