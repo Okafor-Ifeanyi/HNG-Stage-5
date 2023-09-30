@@ -14,64 +14,45 @@ const videoDirectory = path.join(__filename, '../uploads/videos');
 
 const uploader = async(req, res, next) => {
     const Info = req.body;
-  console.log("hello")
+  console.log(req.file)
+  console.log("Hello World: !")
 
   try {
-    // profile Picture
-    if (req.files) {
-      // if (req.files.video !== undefined) {
-      //   var profile_img = await storeImage(req.files.video.path)
-      // } 
-
-      await upload.single('file')(req, res, function (err) {
-        if (err instanceof multer.MulterError) {
-          // Handle multer errors (e.g., file size exceeded)
-          return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-          // Handle other errors
-          console.error(err); // Log the error for debugging purposes
-          return res.status(500).json({ success: false, message: err.message });
-        }
-
-        // File uploaded successfully, continue with uploader middleware
-        uploader(req, res);
-
+    if (req.file) {
         // If there is a file in the request, it's a standard upload
-        const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${Date.now()}_video.mp4`;
-        return res.status(200).json({ 
-          success: true, 
-          link: videoPath 
-        });
-        // return res.status(200).json({ 
-        //     success: true, 
-        //     link: profile_img })
-    })
+        const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${req.file.filename}`;
+        return res.status(200).json({ success: true, link: videoPath });
     }
 
-     // Check if it's a chunk upload or the finalization request
-     if (req.body.finalize) {
-      const chunkData = req.body.chunkData; // Assuming you have a 'chunkData' field in your request
-      if (chunkData) {
-          fs.appendFile('appending.mp4', chunkData, (err) => {
-              if (err) {
-                  console.error('Error appending video chunk:', err);
-                  return res.status(500).json({ error: 'Error uploading video chunk' });
-              }
+      // If there's no file, it's a chunked upload
+      // You should handle chunked uploads here, such as assembling the chunks
+      // and saving the complete video to a permanent location
 
-              // After appending, proceed to finalize by renaming
-              fs.rename('appending.mp4', `uploads/videos/${req.file.filename}`, (err) => {
+      // Check if it's a chunk upload or the finalization request
+      if (req.body.finalize) {
+          // Handle the request to finalize the upload
+          // First, append any remaining chunk data (if needed)
+          const chunkData = req.body.chunkData; // Assuming you have a 'chunkData' field in your request
+          if (chunkData) {
+              fs.appendFile('tempVideo.mp4', chunkData, (err) => {
                   if (err) {
-                      console.error('Error finalizing video upload:', err);
-                      return res.status(500).json({ error: 'Error finalizing video upload' });
-                  } else {
-                      const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${req.file.filename}`;
-                      return res.status(200).json({ success: true, link: videoPath });
+                      console.error('Error appending video chunk:', err);
+                      return res.status(500).json({ error: 'Error uploading video chunk' });
                   }
-              });
-          });
-      }
-    }
 
+                  // After appending, proceed to finalize by renaming
+                  fs.rename('tempVideo.mp4', `uploads/videos/${req.file.filename}`, (err) => {
+                      if (err) {
+                          console.error('Error finalizing video upload:', err);
+                          return res.status(500).json({ error: 'Error finalizing video upload' });
+                      } else {
+                          const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${req.file.filename}`;
+                          return res.status(200).json({ success: true, link: videoPath });
+                      }
+                  });
+              });
+          }
+      }
   } catch (error) {
     console.error(error);
     return res.status(500).json({ Success: false, message: error.message }) 
