@@ -1,0 +1,30 @@
+{
+  "name": "hng-stage-5",
+  "version": "1.0.0",
+  "description": "You will develop the Backend for their Chrome task. This backend will receive the video they send, save it to disk and render the page where the video can be played. Do not add authentication. This is an individual task, not a team task. Have your own repo where you work on this. You do not need to use a DB for this, except you want to.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cloudinary": "^1.41.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-form-data": "^2.0.22",
+    "form-data": "^4.0.0",
+    "joi": "^17.10.2",
+    "mongoose": "^7.5.3",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemon": "^3.0.1",
+    "stream": "^0.0.2"
+  }
+}
