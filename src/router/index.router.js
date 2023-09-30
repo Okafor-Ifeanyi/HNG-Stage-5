@@ -1,10 +1,10 @@
 import express from 'express'
 const router = express.Router()
+import { uploader, getAllVideos, getSingleVideo } from '../upload/upload.controller.js';
 
-  
-// Member CRUD Operation
-router.post("/upload", validate(memberSchema), register);
-router.post("/login", validate(loginMember), login);
-router.get("/", isAuth, getMyProfile);
+// Video CRUD Operation
+router.post("/upload", uploader);
+router.get("/", getAllVideos);
+router.get("/:name", getSingleVideo);
 
-exports = router;
+export default router

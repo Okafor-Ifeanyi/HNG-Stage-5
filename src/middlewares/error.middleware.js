@@ -1,4 +1,4 @@
-export const errorHandler = (error, req, res, next) => {
+const errorHandler = (error, req, res, next) => {
     const errorStatus = error.status || 501
     const errorMessage = error.message || "Somethign went wrong"
     return res.status(errorStatus).json({
@@ -6,3 +6,5 @@ export const errorHandler = (error, req, res, next) => {
         message: errorMessage
     })
 }
+
+export{ errorHandler }
