@@ -1,15 +1,12 @@
 import express from 'express'
 import cors from "cors"
 import morgan from "morgan"
-import bodyParser from 'body-parser'
-import formData from 'express-form-data'
 import router from "../router/index.router.js"
 import { errorHandler } from '../middlewares/error.middleware.js'
 
 export function createServer() {
     const app = express()
 
-    app.use(bodyParser())
     app.use(morgan('dev'))
 
     // Setup Cross-Origin Resource Sharing 
@@ -28,13 +25,11 @@ export function createServer() {
         next();
     });
     
-    // Form type
-    app.use(express.json())
-    app.use(express.urlencoded({extended: false}))
-    app.use(formData.parse())
-
     // Route link
     app.use('/api', router)
+
+    // Form type
+    app.use(express.json())
     
     // Serve uploaded video files
     app.use('/uploads/videos', express.static('uploads/videos'));
