@@ -1,11 +1,9 @@
 import path from 'path'
 import uploadModel from "./upload.model.js";
 import { storeImage } from "../config/cloudinary.config.js";
-import { finalizeUpload, videoBuffer } from "./upload.util.js";
+import { finalizeUpload, getVideoBuffer } from "./upload.util.js";
 import {fileURLToPath} from 'url';
-import { upload } from '../config/multer.config.js';
-import multer from 'multer';
-
+import fs from 'fs'
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,95 +12,127 @@ const videoDirectory = path.join(__filename, '../uploads/videos');
 
 const uploader = async(req, res, next) => {
     const Info = req.body;
-  console.log("hello")
+  console.log(req.file)
+  console.log("Hello World: !")
 
   try {
-    // profile Picture
-    if (req.files) {
-      // if (req.files.video !== undefined) {
-      //   var profile_img = await storeImage(req.files.video.path)
-      // } 
-
-      await upload.single('file')(req, res, function (err) {
-        if (err instanceof multer.MulterError) {
-          // Handle multer errors (e.g., file size exceeded)
-          return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-          // Handle other errors
-          console.error(err); // Log the error for debugging purposes
-          return res.status(500).json({ success: false, message: err.message });
-        }
-
-        // File uploaded successfully, continue with uploader middleware
-        uploader(req, res);
-
+    if (req.file) {
         // If there is a file in the request, it's a standard upload
-        const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${Date.now()}_video.mp4`;
-        return res.status(200).json({ 
-          success: true, 
-          link: videoPath 
-        });
-        // return res.status(200).json({ 
-        //     success: true, 
-        //     link: profile_img })
-    })
+        const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${req.file.filename}`;
+        return res.status(200).json({ success: true, link: videoPath });
     }
 
-     // Check if it's a chunk upload or the finalization request
-     if (req.body.finalize) {
-      const chunkData = req.body.chunkData; // Assuming you have a 'chunkData' field in your request
-      if (chunkData) {
-          fs.appendFile('appending.mp4', chunkData, (err) => {
-              if (err) {
-                  console.error('Error appending video chunk:', err);
-                  return res.status(500).json({ error: 'Error uploading video chunk' });
-              }
+      // If there's no file, it's a chunked upload
+      // You should handle chunked uploads here, such as assembling the chunks
+      // and saving the complete video to a permanent location
 
-              // After appending, proceed to finalize by renaming
-              fs.rename('appending.mp4', `uploads/videos/${req.file.filename}`, (err) => {
+      // Check if it's a chunk upload or the finalization request
+      if (req.body.finalize) {
+          // Handle the request to finalize the upload
+          // First, append any remaining chunk data (if needed)
+          const chunkData = req.body.chunkData; // Assuming you have a 'chunkData' field in your request
+          if (chunkData) {
+              fs.appendFile('tempVideo.mp4', chunkData, (err) => {
                   if (err) {
-                      console.error('Error finalizing video upload:', err);
-                      return res.status(500).json({ error: 'Error finalizing video upload' });
-                  } else {
-                      const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${req.file.filename}`;
-                      return res.status(200).json({ success: true, link: videoPath });
+                      console.error('Error appending video chunk:', err);
+                      return res.status(500).json({ error: 'Error uploading video chunk' });
                   }
-              });
-          });
-      }
-    }
 
+                  // After appending, proceed to finalize by renaming
+                  fs.rename('tempVideo.mp4', `uploads/videos/${req.file.filename}`, (err) => {
+                      if (err) {
+                          console.error('Error finalizing video upload:', err);
+                          return res.status(500).json({ error: 'Error finalizing video upload' });
+                      } else {
+                          const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${req.file.filename}`;
+                          return res.status(200).json({ success: true, link: videoPath });
+                      }
+                  });
+              });
+          }
+      }
   } catch (error) {
     console.error(error);
     return res.status(500).json({ Success: false, message: error.message }) 
   }
 }
 
+const startSession = async (req, res) => {
+  try{
+    const session = await uploadModel.create({})
+
+    // Respond with success to use _id as sessionId
+    res.status(200).json({ 
+      success: true, 
+      message: "Video Session Started", 
+      sessionId: session._id
+    });
+  } catch(error) {
+    console.error('Error handling chunk upload:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+// Define the route to handle chunked video uploads
 const uploadChunk = async (req, res) => {
+  const sessionId = req.params.sessionId; // Get the session ID from the URL
+
   try {
-    const chunkData = req.file.buffer;
+    let chunkData 
 
-    // Append the chunk data to the video buffer
-    videoBuffer = Buffer.concat([videoBuffer, chunkData]);
+    // // if (!(chunkData instanceof Buffer)){
+    // //   chunkData = fs.readFileSync(req.file.path);
+    // // }
+    // const chunkData = req.file.buffer;
+    // console.log(req.file)
+    // console.log(req.file.buffer)   
 
-    // Respond with success for the chunk upload
-    res.status(200).json({ success: true });
+
+    const filePath = req.file.path;
+
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        console.error('Error reading file:', err);
+      } else {
+        // 'data' now contains the buffer with the file's content
+        // You can process or manipulate the buffer here
+        console.log("File read successfully")
+        // Append the chunk data to the video buffer specific to the session
+        let videoBuffer = getVideoBuffer(sessionId); // Retrieve or create the session-specific video buffer
+
+        videoBuffer = Buffer.concat([videoBuffer, data]); // Append the chunk data
+
+        // Respond with success for the chunk upload
+        return res.status(200).json({ 
+          success: true,
+          message: "Video Saved Successfully" });
+      }
+    });
+
   } catch (error) {
     console.error('Error handling chunk upload:', error);
-    res.status(500).json({ error: 'Error uploading video chunk' });
+    res.status(500).json({ error: error.message });
   }
 };
 
 // Define the route to finalize the upload
-const finalizeChunk = async (req, res) => {
+const finalizeChunks = async (req, res) => {
+  const sessionId = req.params.sessionId; // Get the session ID from the URL
   try {
-    const finalVideoPath = await finalizeUpload();
+    let videoBuffer = getVideoBuffer(sessionId); // Retrieve the session-specific video buffer
+    // console.log(videoBuffer.toString())
+    // Implement the logic to finalize and save the video based on the session-specific buffer
+    const finalVideoPath = await finalizeUpload(sessionId, videoBuffer);
+
+    // update the session here
+
     res.status(200).json({ success: true, link: finalVideoPath });
   } catch (error) {
     console.error('Error finalizing video upload:', error);
     res.status(500).json({ error: 'Error finalizing video upload' });
   }
 };
+
 
 const getSingleVideo = (req, res, next) => {
   const filename = req.params.name;
@@ -151,4 +181,4 @@ const getAllVideos = (req, res) => {
   }
 };
 
-export { uploader, uploadChunk, finalizeChunk, getSingleVideo, getAllVideos }
+export { uploader, uploadChunk, finalizeChunks, getSingleVideo, getAllVideos, startSession }

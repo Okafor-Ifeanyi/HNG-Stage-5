@@ -4,9 +4,11 @@ const Schema = mongoose.Schema;
 const uploadSchema = new Schema({
     video_url: {
       type: String,
-      required: true,
     },
     description: {
+      type: String
+    },
+    transcription: {
       type: String
    }
   },
