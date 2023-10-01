@@ -75,15 +75,22 @@ const uploadChunk = async (req, res) => {
 };
 
 // Define the route to finalize the upload
-const finalizeChunk = async (req, res) => {
+app.post('/finalize-upload/:sessionId', async (req, res) => {
+  const sessionId = req.params.sessionId; // Get the session ID from the URL
+
   try {
-    const finalVideoPath = await finalizeUpload();
+    const videoBuffer = getVideoBuffer(sessionId); // Retrieve the session-specific video buffer
+
+    // Implement the logic to finalize and save the video based on the session-specific buffer
+    const finalVideoPath = await finalizeUpload(sessionId, videoBuffer);
+
     res.status(200).json({ success: true, link: finalVideoPath });
   } catch (error) {
     console.error('Error finalizing video upload:', error);
     res.status(500).json({ error: 'Error finalizing video upload' });
   }
-};
+});
+
 
 const getSingleVideo = (req, res, next) => {
   const filename = req.params.name;

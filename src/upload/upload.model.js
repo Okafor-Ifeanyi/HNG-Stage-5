@@ -8,6 +8,9 @@ const uploadSchema = new Schema({
     },
     description: {
       type: String
+    },
+    transcription: {
+      type: String
    }
   },
     { timestamps: {
