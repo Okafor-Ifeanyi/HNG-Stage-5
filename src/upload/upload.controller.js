@@ -3,7 +3,7 @@ import uploadModel from "./upload.model.js";
 import { storeImage } from "../config/cloudinary.config.js";
 import { finalizeUpload, getVideoBuffer, mergeVideos } from "./upload.util.js";
 import {fileURLToPath} from 'url';
-import transcribeLocalVideo from './upload.helper.js';
+import { transcribe } from './upload.helper.js';
 import fs from 'fs'
 
 
@@ -78,17 +78,13 @@ const uploadChunk = async (req, res) => {
   const sessionId = req.params.sessionId; // Get the session ID from the URL
 
   try {
-    let chunkData 
-
     // // if (!(chunkData instanceof Buffer)){
     // //   chunkData = fs.readFileSync(req.file.path);
     // // }
     // const chunkData = req.file.buffer;
     // console.log(req.file)
     // console.log(req.file.buffer)   
-
-
-    const filePath = req.file;
+    const filePath = req.file.path;
 
     fs.readFile(filePath, (err, data) => {
       if (err) {
@@ -128,16 +124,23 @@ const finalizeChunks = async (req, res) => {
 
     // Implement the logic to finalize and save the video based on the session-specific buffer
     const finalVideoPath = await finalizeUpload(sessionId, videoBuffer);
-    const trans = await transcription(req.file.path);
 
-  
-    mergeVideos(videoPaths, outputFilePath, (error, mergedFilePath) => {
+    // get session id object from the db
+    const sessionData = await uploadModel.findOne({_id: sessionId})
+    
+    // creating output path
+    const outputPath = `uploads/videos/${sessionId}/merged-video.mp4`
+
+    mergeVideos(sessionData.chunk_path, outputPath, (error, mergedFilePath) => {
       if (error) {
         console.error('Video merging failed:', error);
       } else {
         console.log('Merged video saved to:', mergedFilePath);
       }
+      return mergedFilePath
     });
+
+    // const trans = await transcribe(finalVideoPath);
 
     // update the session here
     const session = await uploadModel.findByIdAndUpdate(sessionId, {
@@ -146,6 +149,7 @@ const finalizeChunks = async (req, res) => {
     res.status(200).json({ 
       success: true, 
       link: finalVideoPath,
+      mergedVideo: outputPath,
       sessionData: session
     });
   } catch (error) {
