@@ -8,7 +8,7 @@ function ffmpeg(command) {
   return exec(`${ffmpegStatic} ${command}`);
 }
 
-async function transcribeLocalVideo(filePath) {
+async function transcribe(filePath) {
   ffmpeg(`-i ${filePath} -hide_banner -y -i ${filePath} ${filePath}.wav`);
 
   const file = {
@@ -23,4 +23,4 @@ async function transcribeLocalVideo(filePath) {
   return response.results;
 }
 
-export default transcribeLocalVideo;
+export { transcribe };

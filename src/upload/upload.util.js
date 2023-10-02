@@ -1,6 +1,7 @@
 import fs from "fs"
 import path from 'path';
 import {fileURLToPath} from 'url';
+import ffmpeg from "fluent-ffmpeg";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -28,17 +29,14 @@ async function finalizeUpload(sessionId, videoBuffer) {
     return finalVideoPath;
   }
 
-  const ffmpeg = require('fluent-ffmpeg');
 
 function mergeVideos(videoPaths, outputFilePath, callback) {
   const command = ffmpeg();
-
   videoPaths.forEach((videoPath) => {
     command.input(videoPath);
   });
 
-  command.mergeToFile(outputFilePath)
-    .on('end', () => {
+  command.mergeToFile(outputFilePath).on('end', () => {
       console.log('Video merging finished.');
       callback(null, outputFilePath); // Call the callback with success
     })
@@ -49,16 +47,5 @@ function mergeVideos(videoPaths, outputFilePath, callback) {
 
   command.run();
 }
-  
-  
-  const outputFilePath = 'path/to/output/merged-video.mp4';
-  
-  mergeVideos(videoPaths, outputFilePath, (error, mergedFilePath) => {
-    if (error) {
-      console.error('Video merging failed:', error);
-    } else {
-      console.log('Merged video saved to:', mergedFilePath);
-    }
-  });
   
 export{ finalizeUpload, getVideoBuffer, mergeVideos }
