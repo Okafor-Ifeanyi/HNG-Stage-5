@@ -13,7 +13,7 @@ async function transcribe(filePath) {
 
   const file = {
     buffer: fs.readFileSync(`${filePath}.wav`),
-    mimetype: "audio/wav",
+    mimetype: "video/me4",
   };
 
   const response = await deepgram.transcription.preRecorded(file, {
