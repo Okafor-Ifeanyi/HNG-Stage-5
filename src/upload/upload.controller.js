@@ -1,61 +1,6 @@
-import path from 'path'
 import uploadModel from "./upload.model.js";
-import { storeImage } from "../config/cloudinary.config.js";
 import { finalizeUpload, getVideoBuffer, mergeVideos } from "./upload.util.js";
-import {fileURLToPath} from 'url';
-import { transcribe } from './upload.helper.js';
 import fs from 'fs'
-
-
-const __filename = fileURLToPath(import.meta.url);
-
-const videoDirectory = path.join(__filename, '../uploads/videos');
-
-const uploader = async(req, res, next) => {
-    const Info = req.body;
-  console.log(req.file)
-  console.log("Hello World: !")
-
-  try {
-    if (req.file) {
-        // If there is a file in the request, it's a standard upload
-        const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${req.file.filename}`;
-        return res.status(200).json({ success: true, link: videoPath });
-    }
-
-      // If there's no file, it's a chunked upload
-      // You should handle chunked uploads here, such as assembling the chunks
-      // and saving the complete video to a permanent location
-
-      // Check if it's a chunk upload or the finalization request
-      if (req.body.finalize) {
-          // Handle the request to finalize the upload
-          // First, append any remaining chunk data (if needed)
-          const chunkData = req.body.chunkData; // Assuming you have a 'chunkData' field in your request
-          if (chunkData) {
-              fs.appendFile('tempVideo.mp4', chunkData, (err) => {
-                  if (err) {
-                      console.error('Error appending video chunk:', err);
-                      return res.status(500).json({ error: 'Error uploading video chunk' });
-                  }
-
-                  // After appending, proceed to finalize by renaming
-                  fs.rename('tempVideo.mp4', `uploads/videos/${req.file.filename}`, (err) => {
-                      if (err) {
-                          console.error('Error finalizing video upload:', err);
-                          return res.status(500).json({ error: 'Error finalizing video upload' });
-                      } else {
-                          const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${req.file.filename}`;
-                      }
-                  });
-              });
-          }
-      }
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ Success: false, message: error.message }) 
-  }
-}
 
 const startSession = async (req, res) => {
   try{
@@ -127,29 +72,33 @@ const finalizeChunks = async (req, res) => {
 
     // get session id object from the db
     const sessionData = await uploadModel.findOne({_id: sessionId})
-    
+    console.log(sessionData)
+
     // creating output path
     const outputPath = `uploads/videos/${sessionId}/merged-video.mp4`
 
-    mergeVideos(sessionData.chunk_path, outputPath, (error, mergedFilePath) => {
-      if (error) {
-        console.error('Video merging failed:', error);
-      } else {
-        console.log('Merged video saved to:', mergedFilePath);
-      }
-      return mergedFilePath
-    });
+    // Issue of ffmpeg ssociated with block 135 - 144 below
 
+    // mergeVideos(sessionData.chunk_path, outputPath, (error, mergedFilePath) => {
+    //   if (error) {
+    //     console.error('Video merging failed:', error);
+    //   } else {
+    //     console.log('Merged video saved to:', mergedFilePath);
+    //   }
+    //   return mergedFilePath
+    // });
+
+    // This link should transcribe the final video
     // const trans = await transcribe(finalVideoPath);
 
-    // update the session here
+    // update the session here with the transcribed data
     const session = await uploadModel.findByIdAndUpdate(sessionId, {
-       transcription: trans }, { new: true })
+       video_url: finalVideoPath }, { new: true })
 
     res.status(200).json({ 
       success: true, 
       link: finalVideoPath,
-      mergedVideo: outputPath,
+      // mergedVideo: outputPath,
       sessionData: session
     });
   } catch (error) {
@@ -159,51 +108,61 @@ const finalizeChunks = async (req, res) => {
 };
 
 
-const getSingleVideo = (req, res, next) => {
-  const filename = req.params.name;
+const streamSingleVideo = async (req, res, next) => {
+  const sessionId = req.params.sessionId;
 
-  const videoPath = path.join(videoDirectory, filename);
-  console.log(videoDirectory);
-   // Check if the video file exists
-   if (fs.existsSync(videoPath)) {
-      // Use the 'video/mp4' MIME type for video files (adjust as needed)
-      res.setHeader('Content-Type', 'video/mp4');
-      
-      // Stream the video file to the response
-      const videoStream = fs.createReadStream(videoPath);
-      videoStream.pipe(res);
-  } else {
-      // Return a 404 error if the video file does not exist
-      res.status(404).send('Video not found');
-  }
-};
-
-const getAllVideos = (req, res) => {
   try {
-    // Read the contents of the video directory
-    fs.readdir(videoDirectory, (err, files) => {
-        if (err) {
-            console.error('Error reading video directory:', err);
-            return res.status(500).json({ error: 'An error occurred while fetching videos' });
-        }
+    const sessionData = await uploadModel.findOne({_id : sessionId })
 
-        // Filter out non-video files (adjust as needed based on file types)
-        const videoFiles = files.filter((file) => {
-            const fileExtension = path.extname(file).toLowerCase();
-            return ['.mp4', '.avi', '.mkv'].includes(fileExtension); // Add more extensions if necessary
-        });
-
-        // Construct an array of video URLs
-        const videoUrls = videoFiles.map((file) => {
-            return `${req.protocol}://${req.get('host')}/uploads/videos/${file}`;
-        });
-
-        return res.status(200).json({ success: true, videos: videoUrls });
-    });
+    if (!sessionData){
+      return res.status(401).json({success: false, message: "User not found"})
+    }
+    
+    if (fs.existsSync(sessionData.video_url)) {
+        // Use the 'video/mp4' MIME type for video files (adjust as needed)
+        res.setHeader('Content-Type', 'video/mp4');
+        
+        // Stream the video file to the response
+        const videoStream = fs.createReadStream(videoPath);
+        videoStream.pipe(res);
+    } else {
+        // Return a 404 error if the video file does not exist
+        res.status(404).send('Video not found');
+    }
   } catch (error) {
-    console.error('Error fetching videos:', error);
-    return res.status(500).json({ error: 'some error occurred while fetching videos' });
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 
-export { uploader, uploadChunk, finalizeChunks, getSingleVideo, getAllVideos, startSession }
+const getSingleSession = async (req, res) => {
+  const sessionId = req.params.sessionId
+  try {
+    const sessionData = await uploadModel.findOne({_id: sessionId})
+
+    return res.status(200).json({
+      success: true,
+      message: "Session Retrieved Successfully",
+      data: sessionData
+    })
+
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+const getAllVideos = async (req, res) => {
+  try {
+    const sessionData = await uploadModel.find()
+
+    return res.status(200).json({
+      success: true,
+      message: "All Session's Retrieved Successfully",
+      data: sessionData
+    })
+
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export { uploadChunk, finalizeChunks, getSingleSession, streamSingleVideo, getAllVideos, startSession }
