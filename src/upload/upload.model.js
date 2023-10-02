@@ -8,6 +8,9 @@ const uploadSchema = new Schema({
     description: {
       type: String
     },
+    chunk_path: {
+      type: Array
+    },
     transcription: {
       type: String
    }
