@@ -1,8 +1,9 @@
 import path from 'path'
 import uploadModel from "./upload.model.js";
 import { storeImage } from "../config/cloudinary.config.js";
-import { finalizeUpload, getVideoBuffer } from "./upload.util.js";
+import { finalizeUpload, getVideoBuffer, mergeVideos } from "./upload.util.js";
 import {fileURLToPath} from 'url';
+import transcribeLocalVideo from './upload.helper.js';
 import fs from 'fs'
 
 
@@ -45,7 +46,6 @@ const uploader = async(req, res, next) => {
                           return res.status(500).json({ error: 'Error finalizing video upload' });
                       } else {
                           const videoPath = `${req.protocol}://${req.get('host')}/uploads/videos/${req.file.filename}`;
-                          return res.status(200).json({ success: true, link: videoPath });
                       }
                   });
               });
@@ -88,7 +88,7 @@ const uploadChunk = async (req, res) => {
     // console.log(req.file.buffer)   
 
 
-    const filePath = req.file.path;
+    const filePath = req.file;
 
     fs.readFile(filePath, (err, data) => {
       if (err) {
@@ -101,12 +101,17 @@ const uploadChunk = async (req, res) => {
         let videoBuffer = getVideoBuffer(sessionId); // Retrieve or create the session-specific video buffer
 
         videoBuffer = Buffer.concat([videoBuffer, data]); // Append the chunk data
-
-        // Respond with success for the chunk upload
-        return res.status(200).json({ 
-          success: true,
-          message: "Video Saved Successfully" });
       }
+    });
+
+    const session = await uploadModel.findByIdAndUpdate(sessionId, { 
+      $push: { chunk_path: filePath } }, { new: true })
+
+    // Respond with success for the chunk upload
+    return res.status(200).json({ 
+      success: true,
+      message: "Video Saved Successfully",
+      sessionData: session
     });
 
   } catch (error) {
@@ -120,13 +125,29 @@ const finalizeChunks = async (req, res) => {
   const sessionId = req.params.sessionId; // Get the session ID from the URL
   try {
     let videoBuffer = getVideoBuffer(sessionId); // Retrieve the session-specific video buffer
-    // console.log(videoBuffer.toString())
+
     // Implement the logic to finalize and save the video based on the session-specific buffer
     const finalVideoPath = await finalizeUpload(sessionId, videoBuffer);
+    const trans = await transcription(req.file.path);
+
+  
+    mergeVideos(videoPaths, outputFilePath, (error, mergedFilePath) => {
+      if (error) {
+        console.error('Video merging failed:', error);
+      } else {
+        console.log('Merged video saved to:', mergedFilePath);
+      }
+    });
 
     // update the session here
+    const session = await uploadModel.findByIdAndUpdate(sessionId, {
+       transcription: trans }, { new: true })
 
-    res.status(200).json({ success: true, link: finalVideoPath });
+    res.status(200).json({ 
+      success: true, 
+      link: finalVideoPath,
+      sessionData: session
+    });
   } catch (error) {
     console.error('Error finalizing video upload:', error);
     res.status(500).json({ error: 'Error finalizing video upload' });
